@@ -1,65 +1,69 @@
 import os
+import logging
 from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-# Flask сервер (для Render)
-python app.py
+# Логування
+logging.basicConfig(level=logging.INFO)
 
-# Телеграм бот
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-SECURITY_CHAT_ID = os.getenv("SECURITY_CHAT_ID")  # ID групи охорони
+# Flask застосунок
+app = Flask(name)
 
-application = Application.builder().token(BOT_TOKEN).build()
+# Будуємо Telegram Application
+def build_app():
+    return Application.builder().token(os.environ.get("BOT_TOKEN")).build()
 
-# Кнопка
+tg_app = build_app()
+
+# Клавіатура з кнопкою
 MAIN_KB = ReplyKeyboardMarkup(
     [["Попередити охорону"]],
     resize_keyboard=True
 )
 
-# Команда /start
+# Хендлер старт
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Натисніть кнопку нижче, щоб попередити охорону.",
+        "Вітаю! Натисніть кнопку нижче, щоб попередити охорону.",
         reply_markup=MAIN_KB
     )
 
-# Обробка натискання
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Ловимо кнопку
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == "Попередити охорону":
-        await context.bot.send_message(
-            chat_id=SECURITY_CHAT_ID,
-            text="🔔 Хтось викликає охорону з бота!"
-        )
+        chat_id = os.environ.get("SECURITY_CHAT_ID")
+        await tg_app.bot.send_message(chat_id, f"🚨 Хтось викликає охорону!\nВід: {update.message.from_user.full_name}")
         await update.message.reply_text("Охорону попереджено!")
-    else:
-        await update.message.reply_text(
-            "Натисніть кнопку нижче.",
-            reply_markup=MAIN_KB
-        )
 
-# Реєстрація хендлерів
-application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.TEXT, message_handler))
+# Додаємо хендлери
+tg_app.add_handler(CommandHandler("start", start))
+tg_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, button_handler))
 
-# Render Flask endpoint
+
+# ========= Flask WEBHOOK (Render запускає через вебсервер) =========
+
 @app.route("/", methods=["GET"])
 def home():
     return "Bot is running!"
 
-# Запуск бота
+@app.route(f"/{os.environ.get('BOT_TOKEN')}", methods=["POST"])
+def webhook():
+    data = request.get_json(force=True)
+    update = Update.de_json(data, tg_app.bot)
+    tg_app.process_update(update)
+    return "OK"
+
+
+# ========= Запуск бота + Flask =========
+
 if name == "main":
-    from threading import Thread
+    # Старт Telegram бота у фоновому режимі
+    import threading
+    threading.Thread(target=tg_app.run_polling, daemon=True).start()
 
-    # Запускаємо Telegram бота окремо
-    def run_bot():
-        application.run_polling()
-
-    Thread(target=run_bot).start()
-
-    # Запускаємо Flask сервер
+    # Render дає PORT у змінній середовища
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
