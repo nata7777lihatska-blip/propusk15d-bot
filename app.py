@@ -1,78 +1,64 @@
 import os
-import logging
 from flask import Flask, request
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-logging.basicConfig(level=logging.INFO)
-
+# Flask сервер (для Render)
 app = Flask(name)
 
-# Telegram application (створюємо, але не запускаємо polling)
-def build_app():
-    return Application.builder().token(os.getenv("BOT_TOKEN")).build()
+# Телеграм бот
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+SECURITY_CHAT_ID = os.getenv("SECURITY_CHAT_ID")  # ID групи охорони
 
-tg = build_app()
+application = Application.builder().token(BOT_TOKEN).build()
 
-# Клавіатура з 1 кнопкою
-MAIN_KBD = ReplyKeyboardMarkup(
+# Кнопка
+MAIN_KB = ReplyKeyboardMarkup(
     [["Попередити охорону"]],
     resize_keyboard=True
 )
 
-# Старт
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Вітаю! Натисніть кнопку нижче, щоб залишити заявку.",
-        reply_markup=MAIN_KBD
+        "Натисніть кнопку нижче, щоб попередити охорону.",
+        reply_markup=MAIN_KB
     )
 
-# Натиснув кнопку
-async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Напишіть кого пропустити і приблизний час.\n\nПриклад: \"Іван, 18:30, авто АА1234ВК\"",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    context.user_data["waiting_guest"] = True
+# Обробка натискання
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
 
-# Коли користувач пише текст після кнопки
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Якщо очікуємо заявку
-    if context.user_data.get("waiting_guest"):
-        msg = update.message.text.strip()
-
-        send_to = os.getenv("SECURITY_CHAT_ID")
+    if text == "Попередити охорону":
         await context.bot.send_message(
-            chat_id=int(send_to),
-            text=f"🔔 НОВА ЗАЯВКА НА ПРОПУСК:\n{msg}"
+            chat_id=SECURITY_CHAT_ID,
+            text="🔔 Хтось викликає охорону з бота!"
         )
-
-        context.user_data["waiting_guest"] = False
-
-        await update.message.reply_text(
-            "Заявку передано охороні ✔️",
-            reply_markup=MAIN_KBD
-        )
+        await update.message.reply_text("Охорону попереджено!")
     else:
         await update.message.reply_text(
-            "Натисніть кнопку «Попередити охорону».",
-            reply_markup=MAIN_KBD
+            "Натисніть кнопку нижче.",
+            reply_markup=MAIN_KB
         )
 
-# РЕЄСТРУЄМО команди
-tg.add_handler(CommandHandler("start", start))
-tg.add_handler(MessageHandler(filters.Regex("Попередити охорону"), warn))
-tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+# Реєстрація хендлерів
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT, message_handler))
 
-# Вебхук маршрут
-@app.post("/webhook")
-async def webhook():
-    data = request.get_json(force=True)
-    update = Update.de_json(data, tg.bot)
-    await tg.process_update(update)
-    return "ok", 200
-
-# Головна сторінка (для перевірки)
-@app.get("/")
+# Render Flask endpoint
+@app.route("/", methods=["GET"])
 def home():
-    return "Bot is running", 200
+    return "Bot is running!"
+
+# Запуск бота
+if name == "main":
+    from threading import Thread
+
+    # Запускаємо Telegram бота окремо
+    def run_bot():
+        application.run_polling()
+
+    Thread(target=run_bot).start()
+
+    # Запускаємо Flask сервер
+    app.run(host="0.0.0.0", port=10000)
