@@ -4,7 +4,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 # Flask сервер (для Render)
-app = Flask(name)
+python app.py
 
 # Телеграм бот
 BOT_TOKEN = os.getenv("BOT_TOKEN")
