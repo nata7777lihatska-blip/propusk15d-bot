@@ -62,7 +62,7 @@ def webhook():
 
 # ========= Запуск бота + Flask =========
 
-if _ _name_ _ == "__main__":
+if __name__ == "__main__":
     import threading
     threading.Thread(target=tg_app.run_polling, daemon=True).start()
 
