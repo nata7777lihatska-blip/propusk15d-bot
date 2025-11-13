@@ -1,3 +1,4 @@
+
 import os
 import logging
 from flask import Flask, request
@@ -35,7 +36,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "Попередити охорону":
         chat_id = os.environ.get("SECURITY_CHAT_ID")
-        await tg_app.bot.send_message(chat_id, f"🚨 Хтось викликає охорону!\nВід: {update.message.from_user.full_name}")
+        await tg_app.bot.send_message(
+            chat_id,
+            f"🚨 Хтось викликає охорону!\nВід: {update.message.from_user.full_name}"
+        )
         await update.message.reply_text("Охорону попереджено!")
 
 # Додаємо хендлери
@@ -60,10 +64,8 @@ def webhook():
 # ========= Запуск бота + Flask =========
 
 if name == "main":
-    # Старт Telegram бота у фоновому режимі
     import threading
     threading.Thread(target=tg_app.run_polling, daemon=True).start()
 
-    # Render дає PORT у змінній середовища
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
