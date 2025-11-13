@@ -1,4 +1,3 @@
-
 import os
 import logging
 from flask import Flask, request
@@ -9,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, ContextTyp
 logging.basicConfig(level=logging.INFO)
 
 # Flask застосунок
-app = Flask(name)
+app = Flask(__name__)
 
 # Будуємо Telegram Application
 def build_app():
@@ -47,7 +46,7 @@ tg_app.add_handler(CommandHandler("start", start))
 tg_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, button_handler))
 
 
-# ========= Flask WEBHOOK (Render запускає через вебсервер) =========
+# ========= Flask WEBHOOK =========
 
 @app.route("/", methods=["GET"])
 def home():
@@ -63,7 +62,7 @@ def webhook():
 
 # ========= Запуск бота + Flask =========
 
-if name == "main":
+if _ _name_ _ == "__main__":
     import threading
     threading.Thread(target=tg_app.run_polling, daemon=True).start()
 
